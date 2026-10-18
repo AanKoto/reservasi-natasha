@@ -45,7 +45,7 @@ function render(sl){
     const blk=s.items.find(i=>i.blocked),ppl=s.items.filter(i=>!i.blocked);
     return `<div class="row ${blk||s.used>=2?'full':''}" data-t="${s.time}"><div class="top"><b>${s.time.replace(':','.')}</b><span class="st">${blk?'Slot ditutup':s.used+'/2 terisi'}</span>`+
     (blk?`<button class="sm" data-a="del" data-id="${esc(blk.id)}">Buka slot</button>`:`<button class="sm" data-a="form">Tambah manual</button><button class="sm" data-a="block">Tutup slot</button>`)+`</div>`+
-    ppl.map(i=>`<div class="it"><span>${esc(i.name)} · ${i.pax} orang · ${esc(i.source)}</span><button class="sm" data-a="del" data-id="${esc(i.id)}">Hapus</button></div>`).join('')+
+    ppl.map(i=>`<div class="it"><span>${esc(i.name)} · ${i.pax} orang · ${esc(i.source)}${i.layanan?' · '+esc(i.layanan):''}</span><button class="sm" data-a="del" data-id="${esc(i.id)}">Hapus</button></div>`).join('')+
     `<form class="f" hidden><input name="name" placeholder="Nama" required><input name="phone" placeholder="No HP"><input name="email" type="email" placeholder="Email (opsional)"><select name="pax"><option>1</option><option>2</option></select><button class="sm" style="background:var(--acc);color:#fff">Simpan</button></form></div>`;
   }).join('');
 }

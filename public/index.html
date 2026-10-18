@@ -24,15 +24,15 @@
 <form id="f" novalidate>
 <span class="lab">Nama</span><input id="name" autocomplete="name" placeholder="Nama lengkap" required>
 <span class="lab">No HP</span><input id="phone" type="tel" autocomplete="tel" placeholder="08xx-xxxx-xxxx" required>
-<span class="lab">Email (untuk undangan Google Calendar)</span><input id="email" type="email" autocomplete="email" placeholder="nama@email.com" required>
+<span class="lab">Email (opsional, untuk undangan Google Calendar)</span><input id="email" type="email" autocomplete="email" placeholder="nama@email.com">
 <span class="lab">Berapa Orang</span>
 <div class="segs"><button type="button" class="seg" data-p="1" aria-pressed="true">1 orang</button><button type="button" class="seg" data-p="2" aria-pressed="false">2 orang</button></div>
-<button class="btn" id="go" disabled>Selesai</button>
+<span class="lab">Pilih Reservasi Untuk — Select Reservation For:</span><label class="chk"><input type="checkbox" value="Konsultasi Dokter — Doctor Consultation (Free)"><span>Konsultasi Dokter — Doctor Consultation (Free)</span></label><label class="chk"><input type="checkbox" value="Facial / Peeling — Facial / Peel Treatment"><span>Facial / Peeling — Facial / Peel Treatment</span></label><label class="chk"><input type="checkbox" value="Konsultasi + Treatment — Consultation + Treatment"><span>Konsultasi + Treatment — Consultation + Treatment</span></label><label class="chk"><input type="checkbox" value="Tindakan Dokter — Doctor Procedure"><span>Tindakan Dokter — Doctor Procedure</span></label><label class="chk"><input type="checkbox" value="Pembelian Produk — Product Purchase"><span>Pembelian Produk — Product Purchase</span></label><label class="chk"><input type="checkbox" value="Kontrol / Follow Up — Follow-Up Visit"><span>Kontrol / Follow Up — Follow-Up Visit</span></label><p class="note">Jika masih ragu, dokter akan membantu menentukan kebutuhan perawatan Anda saat konsultasi. Konsultasi gratis. (If you’re unsure, our doctor will help determine the appropriate treatment during your consultation. Consultation is free.)</p><button class="btn" id="go" disabled>Selesai</button>
 <div class="msg err" id="err" role="alert"></div>
 </form>
 <div id="done" hidden>
 <div class="chip">Reservasi tercatat</div>
-<p class="sub" style="margin-top:12px">Undangan Google Calendar dikirim ke email kamu. Lanjutkan ke WhatsApp untuk konfirmasi ke klinik.</p>
+<p class="sub" id="doneTxt" style="margin-top:12px">Undangan Google Calendar dikirim ke email kamu. Lanjutkan ke WhatsApp untuk konfirmasi ke klinik.</p>
 <a class="btn wa" id="wa" href="#">Buka WhatsApp</a>
 </div>
 </section>
@@ -68,11 +68,18 @@ $('#slots').onclick=e=>{const b=e.target.closest('.slot');if(!b||b.disabled)retu
   document.querySelectorAll('.slot').forEach(x=>x.setAttribute('aria-pressed',x===b));sync()};
 document.querySelectorAll('.seg').forEach(b=>b.onclick=()=>{pax=+b.dataset.p;sync()});
 $('#f').onsubmit=async e=>{
-  e.preventDefault();$('#err').textContent='';$('#go').disabled=true;
+  e.preventDefault();$('#err').textContent='';
+  const layanan=[...document.querySelectorAll('.chk input:checked')].map(x=>x.value);
+  const em=$('#email').value.trim();
+  if(!$('#name').value.trim())return $('#err').textContent='Nama wajib diisi';
+  if(!/^[0-9+\-\s]{8,16}$/.test($('#phone').value))return $('#err').textContent='No HP wajib diisi dengan benar';
+  if(em&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em))return $('#err').textContent='Format email belum benar';
+  if(!layanan.length)return $('#err').textContent='Pilih minimal satu layanan';
+  $('#go').disabled=true;
   try{
-    const r=await fetch('/api/book',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:$('#name').value,phone:$('#phone').value,email:$('#email').value,pax,date,time})});
+    const r=await fetch('/api/book',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:$('#name').value,phone:$('#phone').value,email:em,pax,date,time,layanan})});
     const j=await r.json();if(!r.ok)throw new Error(j.error||'Gagal menyimpan');
-    $('#f').hidden=true;$('#done').hidden=false;$('#wa').href=j.wa;
+    $('#f').hidden=true;$('#done').hidden=false;$('#doneTxt').textContent=em?'Undangan Google Calendar dikirim ke email kamu. Lanjutkan ke WhatsApp untuk konfirmasi ke klinik.':'Lanjutkan ke WhatsApp untuk konfirmasi ke klinik.';$('#wa').href=j.wa;
     setTimeout(()=>{location.href=j.wa},1500);
   }catch(x){$('#err').textContent=x.message;$('#go').disabled=false;loadSlots()}
 };

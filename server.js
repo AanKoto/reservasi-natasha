@@ -15,6 +15,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const bad = (m, c = 400) => Object.assign(new Error(m), { status: c });
 const w = f => (q, s) => f(q, s).catch(e => { console.error(e.message); s.status(e.status || 500).json({ error: e.message }); });
+const SERVICES = [
+  'Konsultasi Dokter — Doctor Consultation (Free)',
+  'Facial / Peeling — Facial / Peel Treatment',
+  'Konsultasi + Treatment — Consultation + Treatment',
+  'Tindakan Dokter — Doctor Procedure',
+  'Pembelian Produk — Product Purchase',
+  'Kontrol / Follow Up — Follow-Up Visit',
+];
 const hh = h => String(h).padStart(2, '0');
 const todayJkt = () => new Date().toLocaleDateString('en-CA', { timeZone: TZ });
 const nowHour = () => +new Date().toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', hour12: false }).slice(0, 2);
@@ -40,7 +48,7 @@ async function slots(date) {
   return hoursFor(date).map(h => {
     const items = ev.filter(e => e.start.dateTime && e.start.dateTime.slice(11, 13) === hh(h)).map(e => {
       const p = e.extendedProperties.private;
-      return { id: e.id, name: p.name, phone: p.phone, pax: +p.pax || 0, source: p.source, blocked: p.blocked === '1' };
+      return { id: e.id, name: p.name, phone: p.phone, layanan: p.layanan || '', pax: +p.pax || 0, source: p.source, blocked: p.blocked === '1' };
     });
     const blocked = items.some(i => i.blocked);
     const used = items.reduce((n, i) => n + i.pax, 0);
@@ -63,11 +71,11 @@ function createEvent(date, time, o) {
     calendarId: CAL_ID, sendUpdates: o.email ? 'all' : 'none',
     requestBody: {
       summary: o.blocked ? 'DITUTUP - Reservasi' : `Reservasi: ${o.name} (${o.pax} orang)`,
-      description: o.blocked ? 'Slot ditutup admin' : `Nama: ${o.name}\nNo HP: ${o.phone}\nBerapa Orang: ${o.pax}\nSumber: ${o.source}`,
+      description: o.blocked ? 'Slot ditutup admin' : `Nama: ${o.name}\nNo HP: ${o.phone}\nBerapa Orang: ${o.pax}\nSumber: ${o.source}\nLayanan: ${o.layanan || '-'}`,
       start: { dateTime: `${date}T${hh(h)}:00:00+07:00`, timeZone: TZ },
       end: { dateTime: `${date}T${hh(h + 1)}:00:00+07:00`, timeZone: TZ },
       attendees: o.email ? [{ email: o.email }] : undefined,
-      extendedProperties: { private: { app: 'reservasi', pax: String(o.blocked ? 0 : o.pax), name: o.name || '', phone: o.phone || '', source: o.source || 'online', blocked: o.blocked ? '1' : '0' } },
+      extendedProperties: { private: { app: 'reservasi', pax: String(o.blocked ? 0 : o.pax), name: o.name || '', phone: o.phone || '', layanan: o.layanan || '', source: o.source || 'online', blocked: o.blocked ? '1' : '0' } },
     },
   });
 }
@@ -79,14 +87,14 @@ app.get('/api/slots', w(async (q, s) => {
 }));
 
 app.post('/api/book', w(async (q, s) => {
-  const { name, phone, email, pax, date, time } = q.body || {};
+  const { name, phone, email, pax, date, time, layanan } = q.body || {};
   const n = +pax;
-  if (!name || !name.trim() || !/^[0-9+\-\s]{8,16}$/.test(phone || '') || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email || '') || ![1, 2].includes(n) || !/^\d\d:00$/.test(time || ''))
+  if (!name || !name.trim() || !/^[0-9+\-\s]{8,16}$/.test(phone || '') || (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) || ![1, 2].includes(n) || !Array.isArray(layanan) || !layanan.length || !layanan.every(x => SERVICES.includes(x)) || !/^\d\d:00$/.test(time || ''))
     throw bad('Data belum lengkap atau tidak valid');
   await ensureFree(date, time, n, false);
-  await createEvent(date, time, { name: name.trim(), phone, email, pax: n, source: 'online' });
+  await createEvent(date, time, { name: name.trim(), phone, email, pax: n, layanan: layanan.join(', '), source: 'online' });
   const tgl = new Date(date + 'T12:00:00Z').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
-  const msg = `Halo Natasha Casablanca, saya ingin konfirmasi reservasi.\nNama: ${name.trim()}\nNo HP: ${phone}\nBerapa Orang: ${n}\nTanggal: ${tgl}\nJam: ${time.replace(':', '.')}`;
+  const msg = `Halo Natasha Casablanca, saya ingin konfirmasi reservasi.\nNama: ${name.trim()}\nNo HP: ${phone}\nBerapa Orang: ${n}\nTanggal: ${tgl}\nJam: ${time.replace(':', '.')}\nLayanan: ${layanan.join(', ')}`;
   s.json({ ok: true, wa: `https://wa.me/${WA}?text=${encodeURIComponent(msg)}` });
 }));
 
