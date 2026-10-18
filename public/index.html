@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reservasi · Natasha Casablanca</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="page">
+<img class="banner" src="logo.png" alt="Natasha Casablanca">
+<h1>Reservasi</h1>
+<p class="sub">Pilih jadwal, isi data, dan konfirmasi lewat WhatsApp. Maksimal 2 orang per slot jam.</p>
+<div class="grid">
+<section>
+<span class="lab" id="bln"></span>
+<div class="days" id="days"></div>
+<div class="info" id="info" style="margin-top:14px"></div>
+<span class="lab">Jam tersedia (jeda 1 jam)</span>
+<div class="slots" id="slots"></div>
+</section>
+<section class="card" id="formCard">
+<div class="chip" id="chip">Pilih tanggal dan jam dulu</div>
+<form id="f" novalidate>
+<span class="lab">Nama</span><input id="name" autocomplete="name" placeholder="Nama lengkap" required>
+<span class="lab">No HP</span><input id="phone" type="tel" autocomplete="tel" placeholder="08xx-xxxx-xxxx" required>
+<span class="lab">Email (untuk undangan Google Calendar)</span><input id="email" type="email" autocomplete="email" placeholder="nama@email.com" required>
+<span class="lab">Berapa Orang</span>
+<div class="segs"><button type="button" class="seg" data-p="1" aria-pressed="true">1 orang</button><button type="button" class="seg" data-p="2" aria-pressed="false">2 orang</button></div>
+<button class="btn" id="go" disabled>Selesai</button>
+<div class="msg err" id="err" role="alert"></div>
+</form>
+<div id="done" hidden>
+<div class="chip">Reservasi tercatat</div>
+<p class="sub" style="margin-top:12px">Undangan Google Calendar dikirim ke email kamu. Lanjutkan ke WhatsApp untuk konfirmasi ke klinik.</p>
+<a class="btn wa" id="wa" href="#">Buka WhatsApp</a>
+</div>
+</section>
+</div>
+</main>
+<script>
+const TZ='Asia/Jakarta',$=s=>document.querySelector(s);
+const today=new Date().toLocaleDateString('en-CA',{timeZone:TZ});
+const addDays=(d,n)=>new Date(new Date(d+'T12:00:00Z').getTime()+n*864e5).toISOString().slice(0,10);
+const fmt=(d,o)=>new Date(d+'T12:00:00Z').toLocaleDateString('id-ID',{...o,timeZone:'UTC'});
+let date=today,time=null,left=0,pax=1;
+
+function renderDays(){
+  $('#bln').textContent=fmt(date,{month:'long',year:'numeric'});
+  $('#days').innerHTML=Array.from({length:21},(_,i)=>addDays(today,i)).map(d=>
+    `<button class="day" data-d="${d}" aria-pressed="${d===date}"><small>${fmt(d,{weekday:'short'})}</small><b>${fmt(d,{day:'numeric'})}</b></button>`).join('');
+  const sun=new Date(date+'T12:00:00Z').getUTCDay()===0;
+  $('#info').innerHTML=sun?'<b>Minggu · 09.00–17.00</b>Reservasi terakhir 15.00 (2 jam sebelum tutup 17.00)':'<b>Senin–Sabtu · 09.00–20.00</b>Reservasi terakhir 18.00 (2 jam sebelum tutup 20.00)';
+}
+async function loadSlots(){
+  $('#slots').innerHTML='';
+  const r=await fetch('/api/slots?date='+date);const j=await r.json();
+  $('#slots').innerHTML=(j.slots||[]).map(s=>
+    `<button class="slot" data-t="${s.time}" data-l="${s.left}" ${s.left?'':'disabled'} aria-pressed="${s.time===time}"><b>${s.time.replace(':','.')}</b><small>${s.left?'Sisa '+s.left:'Penuh'}</small></button>`).join('');
+}
+function sync(){
+  $('#chip').textContent=time?`${fmt(date,{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${time.replace(':','.')}`:'Pilih tanggal dan jam dulu';
+  document.querySelectorAll('.seg').forEach(b=>{const p=+b.dataset.p;b.disabled=!time||p>left;b.setAttribute('aria-pressed',p===pax)});
+  $('#go').disabled=!time;
+}
+$('#days').onclick=e=>{const b=e.target.closest('.day');if(!b)return;date=b.dataset.d;time=null;left=0;renderDays();loadSlots();sync()};
+$('#slots').onclick=e=>{const b=e.target.closest('.slot');if(!b||b.disabled)return;time=b.dataset.t;left=+b.dataset.l;if(pax>left)pax=left;
+  document.querySelectorAll('.slot').forEach(x=>x.setAttribute('aria-pressed',x===b));sync()};
+document.querySelectorAll('.seg').forEach(b=>b.onclick=()=>{pax=+b.dataset.p;sync()});
+$('#f').onsubmit=async e=>{
+  e.preventDefault();$('#err').textContent='';$('#go').disabled=true;
+  try{
+    const r=await fetch('/api/book',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:$('#name').value,phone:$('#phone').value,email:$('#email').value,pax,date,time})});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||'Gagal menyimpan');
+    $('#f').hidden=true;$('#done').hidden=false;$('#wa').href=j.wa;
+    setTimeout(()=>{location.href=j.wa},1500);
+  }catch(x){$('#err').textContent=x.message;$('#go').disabled=false;loadSlots()}
+};
+renderDays();loadSlots();sync();
+</script>
+</body>
+</html>

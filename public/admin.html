@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Reservasi · Natasha Casablanca</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+.row{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:8px}
+.row.full{background:#EFE6E3}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.top b{width:56px;font-size:16px}.top .st{flex:1;color:var(--mut);font-size:14px}
+.sm{height:38px;padding:0 14px;border-radius:10px;border:1px solid var(--acc);background:#fff;color:var(--acc);font:inherit;font-weight:700;font-size:13px;cursor:pointer}
+.it{display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:14px;padding:8px 0;border-top:1px solid var(--line);margin-top:8px}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
+.f input,.f select{height:42px}
+.tools{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px}.tools input{width:auto}
+</style>
+</head>
+<body>
+<main class="page" style="max-width:760px">
+<img class="banner" src="logo.png" alt="Natasha Casablanca" style="height:120px">
+<h1>Reservasi · Kelola Slot</h1>
+<p class="sub">Isi booking manual atau tutup slot. Perubahan langsung masuk Google Calendar klinik dan mengurangi kuota di halaman pengunjung.</p>
+<form id="login" class="card" style="max-width:360px"><span class="lab" style="margin-top:0">PIN admin</span><input id="pin" type="password" autocomplete="current-password"><button class="btn">Masuk</button><div class="msg err" id="lerr" role="alert"></div></form>
+<div id="app" hidden>
+<div class="tools"><div><span class="lab" style="margin-top:0">Tanggal</span><input type="date" id="date"></div></div>
+<div id="list"></div>
+</div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let pin=sessionStorage.getItem('pin')||'';
+$('#date').value=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jakarta'});
+async function api(url,method,body){
+  const r=await fetch(url,{method:method||'GET',headers:{'content-type':'application/json','x-admin-pin':pin},body:body?JSON.stringify(body):undefined});
+  const j=await r.json();if(!r.ok)throw new Error(j.error||'Gagal');return j;
+}
+async function load(){
+  try{const d=await api('/api/admin/slots?date='+$('#date').value);$('#login').hidden=true;$('#app').hidden=false;render(d.slots)}
+  catch(e){$('#app').hidden=true;$('#login').hidden=false;$('#lerr').textContent=pin?e.message:''}
+}
+function render(sl){
+  $('#list').innerHTML=sl.map(s=>{
+    const blk=s.items.find(i=>i.blocked),ppl=s.items.filter(i=>!i.blocked);
+    return `<div class="row ${blk||s.used>=2?'full':''}" data-t="${s.time}"><div class="top"><b>${s.time.replace(':','.')}</b><span class="st">${blk?'Slot ditutup':s.used+'/2 terisi'}</span>`+
+    (blk?`<button class="sm" data-a="del" data-id="${esc(blk.id)}">Buka slot</button>`:`<button class="sm" data-a="form">Tambah manual</button><button class="sm" data-a="block">Tutup slot</button>`)+`</div>`+
+    ppl.map(i=>`<div class="it"><span>${esc(i.name)} · ${i.pax} orang · ${esc(i.source)}</span><button class="sm" data-a="del" data-id="${esc(i.id)}">Hapus</button></div>`).join('')+
+    `<form class="f" hidden><input name="name" placeholder="Nama" required><input name="phone" placeholder="No HP"><input name="email" type="email" placeholder="Email (opsional)"><select name="pax"><option>1</option><option>2</option></select><button class="sm" style="background:var(--acc);color:#fff">Simpan</button></form></div>`;
+  }).join('');
+}
+$('#list').onclick=async e=>{
+  const b=e.target.closest('button[data-a]');if(!b)return;
+  const row=b.closest('.row'),t=row.dataset.t,date=$('#date').value;
+  try{
+    if(b.dataset.a==='form')row.querySelector('.f').hidden=false;
+    if(b.dataset.a==='block')await api('/api/admin/block','POST',{date,time:t});
+    if(b.dataset.a==='del'&&confirm('Hapus entri ini? Tamu yang punya email akan menerima pembatalan.'))await api('/api/admin/event/'+encodeURIComponent(b.dataset.id),'DELETE');
+    if(b.dataset.a!=='form')load();
+  }catch(x){alert(x.message)}
+};
+$('#list').onsubmit=async e=>{
+  e.preventDefault();const f=e.target,row=f.closest('.row');
+  try{await api('/api/admin/add','POST',{date:$('#date').value,time:row.dataset.t,name:f.name.value,phone:f.phone.value,email:f.email.value,pax:f.pax.value});load()}catch(x){alert(x.message)}
+};
+$('#login').onsubmit=e=>{e.preventDefault();pin=$('#pin').value;sessionStorage.setItem('pin',pin);load()};
+$('#date').onchange=load;
+if(pin)load();
+</script>
+</body>
+</html>
