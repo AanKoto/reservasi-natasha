@@ -75,7 +75,7 @@ function createEvent(date, time, o) {
 // ---------- Publik ----------
 app.get('/api/slots', w(async (q, s) => {
   const list = await slots(q.query.date);
-  s.json({ slots: list.map(({ time, left }) => ({ time, left })) });
+  s.json({ slots: list.map(({ time, left, past }) => ({ time, left, past })) });
 }));
 
 app.post('/api/book', w(async (q, s) => {

@@ -56,7 +56,7 @@ async function loadSlots(){
   $('#slots').innerHTML='';
   const r=await fetch('/api/slots?date='+date);const j=await r.json();
   $('#slots').innerHTML=(j.slots||[]).map(s=>
-    `<button class="slot" data-t="${s.time}" data-l="${s.left}" ${s.left?'':'disabled'} aria-pressed="${s.time===time}"><b>${s.time.replace(':','.')}</b><small>${s.left?'Sisa '+s.left:'Penuh'}</small></button>`).join('');
+    `<button class="slot" data-t="${s.time}" data-l="${s.left}" ${s.left?'':'disabled'} aria-pressed="${s.time===time}"><b>${s.time.replace(':','.')}</b><small>${s.left?'Sisa '+s.left:(s.past?'Lewat':'Penuh')}</small></button>`).join('');
 }
 function sync(){
   $('#chip').textContent=time?`${fmt(date,{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${time.replace(':','.')}`:'Pilih tanggal dan jam dulu';
